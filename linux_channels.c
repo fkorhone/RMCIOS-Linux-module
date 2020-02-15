@@ -44,10 +44,12 @@ const struct context_rmcios *module_context;
 int timezone_offset=0 ; // Timezone offset(seconds) from UTC
 char use_localtime=1 ; // Flag to use local time
 
-void rtc_class_func(void *data, const struct context_rmcios *context, 
-                    int id, enum function_rmcios function,
-                    int paramtype,union param_rmcios returnv, 
-                    int num_params,union param_rmcios param)
+void rtc_class_func(void *data, 
+                    const struct context_rmcios *context, int id, 
+                    enum function_rmcios function,
+                    enum type_rmcios paramtype,
+                    struct combo_rmcios *returnv, 
+                    int num_params, const union param_rmcios param)
 {   
  time_t rawtime,seconds ;
  time(&seconds) ;
@@ -55,7 +57,7 @@ void rtc_class_func(void *data, const struct context_rmcios *context,
  switch(function)
  {   
      case help_rmcios:
-         return_string(context,paramtype,returnv,
+         return_string(context,returnv,
                  "rtc (realtime clock) channel help :\r\n"
                  " setup rtc timezone_offset(hours) year month day\r\n"
                  "                                  hour minute second\r\n"
@@ -71,7 +73,7 @@ void rtc_class_func(void *data, const struct context_rmcios *context,
          use_localtime=0 ;
          break ;
      case read_rmcios:
-         return_int(context, paramtype, returnv, seconds) ;
+         return_int(context, returnv, seconds) ;
          break ;
      case write_rmcios:
          if(num_params<1) break ;
@@ -190,11 +192,11 @@ struct rtc_str_data
 } default_rtc_str_data= {"%Y-%m-%dT%H:%M:%S%z","",0} ;
 
 void rtc_str_class_func(struct rtc_str_data *this, 
-                        const struct context_rmcios *context, 
-                        int id, enum function_rmcios function,
+                        const struct context_rmcios *context, int id, 
+                        enum function_rmcios function,
                         enum type_rmcios paramtype,
-                        union param_rmcios returnv, 
-                        int num_params,union param_rmcios param)
+                        struct combo_rmcios *returnv, 
+                        int num_params, const union param_rmcios param)
 {
  int i;
  int writelen ;
@@ -203,7 +205,7 @@ void rtc_str_class_func(struct rtc_str_data *this,
  switch(function)
  {
      case help_rmcios:
-         return_string(context,paramtype,returnv,
+         return_string(context,returnv,
                  "rtc string representation subchannel help\r\n"
                  " create rtc_str newname\r\n"
                  " setup rtc_str formatstring |second_decimals(0)\r\n" 
@@ -265,7 +267,7 @@ void rtc_str_class_func(struct rtc_str_data *this,
                      this->second_decimals, 
                      timezone_offset ) ;
              write_str(context, linked_channels(context, id), buffer, 0) ;
-             return_string(context, paramtype, returnv, buffer) ;
+             return_string(context, returnv, buffer) ;
              break ;
          }
 
@@ -276,8 +278,7 @@ void rtc_str_class_func(struct rtc_str_data *this,
                      this->rtc_str_format, 
                      this->second_decimals, 
                      timezone_offset) ;
-             return_string(context, paramtype,
-                     returnv,buffer) ;
+             return_string(context, returnv, buffer) ;
              break ;
          }
  }
@@ -293,17 +294,18 @@ struct file_data
 } fconout={NULL,0,0}, fconin={NULL,0,0};
 
 void file_class_func(struct file_data *this, 
-                     const struct context_rmcios *context, 
-                     int id, enum type_rmcios function,
-                     int paramtype,union param_rmcios returnv, 
-                     int num_params,union param_rmcios param)
+                     const struct context_rmcios *context, int id, 
+                     enum function_rmcios function,
+                     enum type_rmcios paramtype,
+                     struct combo_rmcios *returnv, 
+                     int num_params, const union param_rmcios param)
 {
 const char *s ;
 int plen ;
 switch(function)
 {
     case help_rmcios:
-        return_string(context,paramtype,returnv,
+        return_string(context,returnv,
                       "file channel help\r\n"
                       " create file ch_name\r\n"
                       " setup ch_name filename | mode=a" 
@@ -425,7 +427,7 @@ switch(function)
                     char fbuffer[fsize] ;
                     fread (fbuffer,1,fsize,f);
                     // Return the contents of the file in one call.
-                    return_buffer(context, paramtype,returnv,fbuffer,fsize) ;
+                    return_buffer(context, returnv,fbuffer,fsize) ;
                 }   
                 fclose(f) ;
             }
@@ -451,15 +453,16 @@ static uint64_t GetTickCount()
 }
 
 void clock_class_func(struct clock_data *this, 
-                      const struct rmcios_context *context, 
-                      int id, enum type_rmcios function,
-                      int paramtype, union param_rmcios returnv, 
-                      int num_params,union param_rmcios param)
+                      const struct context_rmcios *context, int id, 
+                      enum function_rmcios function,
+                      enum type_rmcios paramtype,
+                      struct combo_rmcios *returnv, 
+                      int num_params, const union param_rmcios param)
 {
  switch(function)
  {   
      case help_rmcios:
-         return_string(context,paramtype,returnv,
+         return_string(context,returnv,
                        "clock channel help\r\n"
                        " create clock ch_name\r\n"
                        " read ch_name \r\n"
@@ -484,7 +487,7 @@ void clock_class_func(struct clock_data *this,
          uint64_t ticknow ;
          ticknow=GetTickCount();
          float elapsed = ((float)(ticknow-this->start))/1000.0  ;
-         return_float( context, paramtype, returnv, elapsed ) ;
+         return_float( context, returnv, elapsed ) ;
          break ;
      
      case write_rmcios:
@@ -494,7 +497,7 @@ void clock_class_func(struct clock_data *this,
              uint64_t ticknow ;
              ticknow=GetTickCount();
              float elapsed = ((float)(ticknow-this->start))/1000.0 ;
-             return_float( context, paramtype, returnv, elapsed ) ;
+             return_float( context, returnv, elapsed ) ;
                 write_f(context, linked_channels(context, id), elapsed) ;    
              this->start=ticknow ;
          }
@@ -521,11 +524,13 @@ struct timer_data
 static void timerHandler( int sig, siginfo_t *si, void *uc )
 {
     struct timer_data *this=(struct timer_data*) si->si_value.sival_ptr; 
-    module_context->run_channel(module_context, 
+    module_context->run_channel(module_context->data,
+                                module_context, 
                                 linked_channels(module_context, this->id),
                                 write_rmcios, int_rmcios,
-                                (union param_rmcios)0,
-                                0,(union param_rmcios)0) ;
+                                0,
+                                0,
+                                (const union param_rmcios)0);
     
     if(this->loops>0)
     {
@@ -534,11 +539,12 @@ static void timerHandler( int sig, siginfo_t *si, void *uc )
         {
             struct itimerspec its; // Timer 
             if(this->completion_channel !=0) {
-                module_context->run_channel(module_context,
+                module_context->run_channel(module_context->data,
+					    module_context,
                                             this->completion_channel,
                                             write_rmcios, int_rmcios,
-                                            (union param_rmcios)((int)0),0,
-                                            (union param_rmcios)((int)0)
+                                            0 ,0,
+                                            (const union param_rmcios)0
                                             );
             }
             its.it_interval.tv_sec = 0 ;
@@ -551,18 +557,17 @@ static void timerHandler( int sig, siginfo_t *si, void *uc )
 }
 
 void timer_class_func(struct timer_data *this, 
-                      const struct rmcios_context *context, 
-                      int id, 
+                      const struct context_rmcios *context, int id, 
                       enum function_rmcios function,
                       enum type_rmcios paramtype,
-                      union param_rmcios returnv, 
-                      int num_params, union param_rmcios param)
+                      struct combo_rmcios *returnv, 
+                      int num_params, const union param_rmcios param)
 {
  int plen ;
  switch(function)
  {   
      case help_rmcios:
-         return_string(context,paramtype,returnv,
+         return_string(context,returnv,
                  "timer channel help:\r\n"
                  " create timer newname \r\n"
                  " setup newname period | loops(0) | done_channel\r\n"
@@ -701,16 +706,16 @@ static void *rtc_ticker(void *data)
 }
 
 void rtc_timer_class_func(struct rtc_timer_data *t, 
-                          const struct context_rmcios *context, 
-                          int id, enum function_rmcios function,
+                          const struct context_rmcios *context, int id, 
+                          enum function_rmcios function,
                           enum type_rmcios paramtype,
-                          union param_rmcios returnv, 
-                          int num_params, union param_rmcios param)
+                          struct combo_rmcios *returnv, 
+                          int num_params, const union param_rmcios param)
 {
  switch(function) 
  {
      case help_rmcios:
-         return_string(context,paramtype,returnv,
+         return_string(context, returnv,
                  "rtc timer channel help\r\n"
                  "periodic realtime clock timer\r\n"
                  " create rtc_timer newname\r\n"
@@ -811,7 +816,7 @@ void rtc_timer_class_func(struct rtc_timer_data *t,
              seconds = time(0); 
              seconds += timezone_offset;  
              int tleft = t->prevtime + t->period-seconds;
-             return_int(context, paramtype, returnv, tleft);
+             return_int(context, returnv, tleft);
          }
          break ;
  }
